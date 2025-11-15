@@ -1,48 +1,85 @@
 """
-Database Schemas
+Database Schemas for Ride Hailing Prototype
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
-Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Each Pydantic model corresponds to a MongoDB collection where the collection
+name is the lowercase of the class name (e.g., Ride -> "ride").
 """
-
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Literal
+from datetime import datetime
 
-# Example schemas (replace with your own):
+# Shared types
+class Coordinate(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lng: float = Field(..., ge=-180, le=180)
 
-class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
-    name: str = Field(..., description="Full name")
-    email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+class Location(BaseModel):
+    name: Optional[str] = Field(None, description="Human readable name")
+    coordinate: Coordinate
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+class Rider(BaseModel):
+    name: str
+    phone: str
+    language: Literal['en','hi'] = 'en'
+    wallet_balance: float = 0.0
 
-# Add your own schemas here:
-# --------------------------------------------------
+class Driver(BaseModel):
+    name: str
+    phone: str
+    vehicle_type: Literal['auto','taxi']
+    vehicle_number: str
+    verified: bool = True
+    rating: float = 4.8
+    total_rides: int = 0
+    earnings: float = 0.0
+    current_location: Coordinate
+    available: bool = True
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+class Booth(BaseModel):
+    name: str
+    location: Location
+    queue_count: int = 0
+
+class QueueTicket(BaseModel):
+    booth_id: str
+    number: int
+    issued_at: datetime = Field(default_factory=datetime.utcnow)
+    phone: Optional[str] = None
+
+class FareBreakdown(BaseModel):
+    base_fare: float
+    distance_km: float
+    per_km_rate: float
+    time_min: float
+    per_min_rate: float
+    total: float
+
+class Ride(BaseModel):
+    rider_name: str
+    rider_phone: str
+    pickup: Location
+    drop: Location
+    vehicle_type: Literal['auto','taxi']
+    fixed_booth_id: Optional[str] = None
+    status: Literal['requested','driver_en_route','arriving','ongoing','completed','cancelled'] = 'requested'
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    driver_vehicle_number: Optional[str] = None
+    fare: Optional[FareBreakdown] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    route_points: Optional[List[Coordinate]] = None  # for simulation
+    route_index: int = 0
+
+class Rating(BaseModel):
+    ride_id: str
+    driver_id: str
+    stars: int = Field(ge=1, le=5)
+    comment: Optional[str] = None
+
+class ScheduledRide(BaseModel):
+    rider_phone: str
+    booth_id: str
+    vehicle_type: Literal['auto','taxi']
+    scheduled_for: datetime
